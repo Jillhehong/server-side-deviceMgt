@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.4/angular.min.js"></script>
+    <script src="javascripts/test.js"></script>
+</head>
+<body ng-app="myApp">
+<div  ng-controller="myController as ctrl">
+
+    <br>
+    <a href="/deviceMgt" download="deviceManagement.csv" style="text-decoration:none; color:black">device mgt</a><br>
+    <!--<a href="/deviceHistory" download="deviceHistory.csv" style="text-decoration:none; color:black">device history</a><br>-->
+    <!--<a href="/deviceInventory" download="deviceInventory.csv" style="text-decoration:none; color:black">device inventory</a><br>-->
+    <!--<a href="/accessoryInventory" download="accessoryInventory.csv" style="text-decoration:none; color:black">accessory inventor</a><br>-->
+
+    <!--test to get from database-->
+    <button type="button"  ng-click="ctrl.getData()">get device_mgt table</button><br>
+    <button type="button"  ng-click="ctrl.getData()">get device_history table</button><br>
+    <button type="button"  ng-click="ctrl.getData()">get device_inventory table</button><br>
+    <button type="button"  ng-click="ctrl.getData()">get accessory_inventory table</button><br>
+
+
+    <button type="button" ng-click="ctrl.postData()">post device-mgt</button>
+
+
+
+    <button type="button" ng-click="ctrl.test()">test</button>
+    <br>
+
+
+    <input type="text" ng-model="ctrl.search.device_sn"> {{ctrl.search.test1}}
+    <input type="text" ng-model="ctrl.search.parent_clinic">
+    <input type="text" ng-model="ctrl.search.status">
+    <input type="text" ng-model="ctrl.search.location">
+    <button type="button" ng-click="ctrl.searchtext(ctrl.search)">search</button>
+    <br>
+    <button type="button">batch update</button>
+
+
+</div>
+</body>
+</html>
