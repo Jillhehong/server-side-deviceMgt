@@ -79,7 +79,7 @@ function pgPostSqlUtilityFunc(url, sql) {
     });
 }
 /*dynamically query based on device_sn, clinic, status and location fields*/
- function dynamicquerySqlUtilityFunc(url, sql) {
+ function dynamicquerySqlUtilityFuncDeviceMgt(url, sql) {
 
      app.post(url, (req, res, next) => {
 
@@ -120,6 +120,31 @@ function pgPostSqlUtilityFunc(url, sql) {
 
     });
 }
+function dynamicquerySqlUtilityFuncDeviceHistory(url, sql) {
+     app.post(url, (req, res, next) => {
+         // if(req.isAuthenticated()){
+         if(true){
+             const string = Object.keys(req.body)[0];      // get object key
+             const value = req.body[string];      // get object value // do not use Object.values(. It is not well supported in browser
+             var newSql = '';
+             if(value) {
+                  newSql = sql + ' where '+ string + '=${' + string + '}';
+             } else {
+                  newSql = sql;
+             }
+             db.query(newSql, req.body)
+                 .then((response ) => {
+                     return res.json(response);
+                 }, (err) => {
+                     return res.status(500).json(err);
+                 });
+             pgp.end();
+         }
+         else {
+             return  {error:'failed authenticate user'};
+         }
+     })
+}
 
 // download data from database
 function downloadData(url, sql) {
@@ -148,13 +173,15 @@ const sqlList = {
          insert: 'INSERT INTO public.device_management_test( purchase_order, registration_date, device_sn, iccid, imei, model_number, model_description, firmware_version, manufacturer, points_to,use_zywie_sim, sim_provider, zywie_logo, wyless_provision_date, device_test_date, device_suspension_date, status, location, checked_out_by,checked_out_date, checked_in_by, checked_in_date, salesteam, salesperson_name, enterprise_id, parent_clinic, sub_clinic, physician, billable, lease, lease_price_per_month, lease_start_date, lease_end_date) VALUES (${purchase_order}, ${registration_date}, ${device_sn}, ${iccid}, ${imei}, ${model_number}, ${model_description}, ${firmware_version}, ${manufacturer}, ${points_to}, ${use_zywie_sim}, ${sim_provider}, ${zywie_logo}, ${wyless_provision_date}, ${device_test_date}, ${device_suspension_date}, ${status}, ${location}, ${checked_out_by}, ${checked_out_date}, ${checked_in_by}, ${checked_in_date}, ${salesteam}, ${salesperson_name}, ${enterprise_id}, ${parent_clinic}, ${sub_clinic}, ${physician}, ${billable}, ${lease}, ${lease_price_per_month}, ${lease_start_date}, ${lease_end_date});',
          delete: 'delete  from device_management_test where device_sn=${device_sn};',
          getParentClinic: 'select parent_clinic from device_management_test where parent_clinic is not null group by parent_clinic',
-         getSubClinic: 'select sub_clinic from device_management_test where sub_clinic is not null group by sub_clinic'
+         getSubClinic: 'select sub_clinic from device_management_test where sub_clinic is not null group by sub_clinic',
+         getCustomers: "select parent_clinic, sub_clinic, count(device_sn) as totaldevices from device_management_test where parent_clinic is not null and billable = 'Y' group by parent_clinic, sub_clinic order by parent_clinic;"
      },
     deviceHistory: {
         select: 'select * from device_history_test',
         update: 'UPDATE public.device_history_test SET row= ${row}, history_date= ${history_date}, device_sn= ${device_sn}, device_action= ${device_action}, by_whom= ${by_whom}, status= ${status}, device_owner= ${device_owner}, replace_device= ${replace_device}, replaced_device_sn= ${replaced_device_sn}, note=${note} where row=${row};',
         insert: 'insert into device_history_test (row, history_date, device_sn ,  device_action ,  by_whom, status ,  device_owner , replace_device , replaced_device_sn , note) values (${row}, ${history_date}, ${device_sn} ,  ${device_action} ,  ${by_whom}, ${status} ,  ${device_owner}, ${replace_device}, ${replaced_device_sn }, ${note});',
-        delete: 'delete  from device_history_test where row=${row}'
+        delete: 'delete  from device_history_test where row=${row}',
+        getDeviceOnwer: 'select device_owner from device_history_test where device_owner is not null group by device_owner'
     },
     deviceInventory: {
         select: 'select * from device_inventory_test',
@@ -170,12 +197,12 @@ const sqlList = {
 
     },
     dashboard:{
-        orderSummary: 'select sum(order_quantity) as total_ordered_device, sum(received_quantity) as total_received_device, sum(deficiency_quantity) as total_deficiency_qty from device_inventory_test',
-        totalDevices: 'select count(device_sn) from device_management_test',
-        status: 'select status, count(status) from device_management_test group by status',
-        location: 'select location, count(location) from device_management_test group by location',
-        billable: 'select billable, count(billable) from device_management_test group by billable',
-        purchaseOrder: 'select purchase_order, sum(order_quantity) as order_quantity, sum(received_quantity) as received_quantity, sum(deficiency_quantity) as deficiency_quantity from device_inventory_test group by purchase_order',
+        orderSummary: 'select sum(order_quantity) as total_ordered_qty, sum(received_quantity) as total_received_qty, sum(deficiency_quantity) as total_deficiency_qty from device_inventory_test',
+        totalDevices: 'select count(device_sn) from device_management_test where device_sn is not null',
+        status: 'select status, count(status) from device_management_test where status is not null group by status',
+        location: 'select location, count(location) from device_management_test where location is not null group by location',
+        billable: 'select billable, count(billable) from device_management_test where billable is not null group by billable',
+        purchaseOrder: 'select purchase_order, sum(order_quantity) as order_quantity, sum(received_quantity) as received_quantity, sum(deficiency_quantity) as deficiency_quantity from device_inventory_test where purchase_order is not null group by purchase_order',
         parent_clinic: "select parent_clinic, count(device_sn) from device_management_test where parent_clinic is not null and billable='Y'  group by parent_clinic order by parent_clinic",
         sub_clinic: "select sub_clinic, count(device_sn) from device_management_test where parent_clinic ='Heart Smart, Inc' and billable='Y'  group by sub_clinic order by sub_clinic"
     }
@@ -188,7 +215,7 @@ pgPostSqlUtilityFunc('/deviceMgt/update',  sqlList.deviceMgt.update);
 pgPostSqlUtilityFunc('/deviceMgt/insert',  sqlList.deviceMgt.insert);
 pgPostSqlUtilityFunc('/deviceMgt/delete',  sqlList.deviceMgt.delete);
 // query and search
-dynamicquerySqlUtilityFunc('/deviceMgt/filter', sqlList.deviceMgt.select);
+dynamicquerySqlUtilityFuncDeviceMgt('/deviceMgt/filter', sqlList.deviceMgt.select);
 // get device status and location
 pgGetSqlUtilityFunc('/deviceMgt/get/parent_clinic',sqlList.deviceMgt.getParentClinic);
 pgGetSqlUtilityFunc('/deviceMgt/get/sub_clinic',sqlList.deviceMgt.getSubClinic);
@@ -199,20 +226,26 @@ pgGetSqlUtilityFunc('/deviceHistory/get', sqlList.deviceHistory.select);
 pgPostSqlUtilityFunc('/deviceHistory/update',  sqlList.deviceHistory.update);
 pgPostSqlUtilityFunc('/deviceHistory/insert',  sqlList.deviceHistory.insert);
 pgPostSqlUtilityFunc('/deviceHistory/delete',  sqlList.deviceHistory.delete);
+pgGetSqlUtilityFunc('/deviceHistory/get/deviceOwner',  sqlList.deviceHistory.getDeviceOnwer);
+dynamicquerySqlUtilityFuncDeviceHistory('/deviceHistory/search', sqlList.deviceHistory.select);
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////customer mgt//////////////////////////////////////////////////////////////////////////////////////////
+pgGetSqlUtilityFunc('/customerMgt/get', sqlList.deviceMgt.getCustomers);
+
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-
-
 //////////////////dashboard page/////////////////////////////////////////////////////////////////////////////////////////////////
-pgGetSqlUtilityFunc('/dashboard/orderSummary', sqlList.orderSummary);
-pgGetSqlUtilityFunc('/dashboard/totalDevices', sqlList.totalDevices);
-pgGetSqlUtilityFunc('/dashboard/status', sqlList.status);
-pgGetSqlUtilityFunc('/dashboard/location', sqlList.location);
-pgGetSqlUtilityFunc('/dashboard/billable', sqlList.billable);
-pgGetSqlUtilityFunc('/dashboard/purchaseOrder', sqlList.purchaseOrder);
-pgGetSqlUtilityFunc('/dashboard/parent_clinic', sqlList.parent_clinic);
-pgGetSqlUtilityFunc('/dashboard/sub_clinic', sqlList.sub_clinic);
+pgGetSqlUtilityFunc('/dashboard/orderSummary', sqlList.dashboard.orderSummary);
+pgGetSqlUtilityFunc('/dashboard/totalDevices', sqlList.dashboard.totalDevices);
+pgGetSqlUtilityFunc('/dashboard/status', sqlList.dashboard.status);
+pgGetSqlUtilityFunc('/dashboard/location', sqlList.dashboard.location);
+pgGetSqlUtilityFunc('/dashboard/billable', sqlList.dashboard.billable);
+pgGetSqlUtilityFunc('/dashboard/purchaseOrder', sqlList.dashboard.purchaseOrder);
+pgGetSqlUtilityFunc('/dashboard/parentClinic', sqlList.dashboard.parent_clinic);
+pgGetSqlUtilityFunc('/dashboard/subClinic', sqlList.dashboard.sub_clinic);
 
 
 
