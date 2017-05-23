@@ -174,7 +174,7 @@ const sqlList = {
          delete: 'delete  from device_management_test where device_sn=${device_sn};',
          getParentClinic: 'select parent_clinic from device_management_test where parent_clinic is not null group by parent_clinic',
          getSubClinic: 'select sub_clinic from device_management_test where sub_clinic is not null group by sub_clinic',
-         getCustomers: "select parent_clinic, sub_clinic, count(device_sn) as totaldevices from device_management_test where parent_clinic is not null and billable = 'Y' group by parent_clinic, sub_clinic order by parent_clinic;"
+         getCustomers: "select parent_clinic, count(device_sn) as totaldevices from device_management_test where parent_clinic is not null and billable = 'Y' group by parent_clinic order by parent_clinic;"
      },
     deviceHistory: {
         select: 'select * from device_history_test',
@@ -248,7 +248,5 @@ pgGetSqlUtilityFunc('/dashboard/parentClinic', sqlList.dashboard.parent_clinic);
 pgGetSqlUtilityFunc('/dashboard/subClinic', sqlList.dashboard.sub_clinic);
 
 
-
-// app.listen(3000);
 
 module.exports = app;
