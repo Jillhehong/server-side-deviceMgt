@@ -7,6 +7,7 @@ const config = {
     max: 10, // max number of clients in the pool
     idleTimeoutMillis: 30000 // how long a client is allowed to remain idle before being closed
 };
+// const config = 'postgres://zacctzciijrgmz:980809143172c8da47626cf0d984b2a61001c1843f03cca92c8e922a1b024a73@ec2-54-197-230-161.compute-1.amazonaws.com:5432/de7c28knkau6h7';
 const express = require('express');
 const path = require('path');
 const favicon = require('serve-favicon');
@@ -19,8 +20,14 @@ const db = pgp(config); //connect database with configuration
 const stringify = require('csv-stringify');
 const moment = require('moment');
 const cors = require("cors");
+const passport = require('passport'); //passport.js
+// passport-local lets you authenticate using a username and password in your Node.js applications.
+const LocalStrategy = require('passport-local').Strategy;
+// express-session create a session middleware in express
+const session = require('express-session'); //manage user session property
+const bcrypt = require('bcrypt'); //bcrypt module is used to encrypt password stored in database
 
-var app = express();
+const app = express();
 
 // view engine setup
 //app.set('views', path.join(__dirname, 'views'));
@@ -30,10 +37,28 @@ var app = express();
 //app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
 //app.use(logger('dev'));
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(cors());
+
+app.use(session({
+    secret: 'd3kfd20g83jlvn27c04cke037gfjp',
+    resave: true,
+    saveUninitialized: true
+}));
+app.use(passport.initialize());
+app.use(passport.session());
+
+// serialize
+passport.serializeUser(function(user, done) {
+    done(null, user);
+});
+//deserialize
+passport.deserializeUser(function(user, done) {
+    done(null, user);
+});
+
 
 // render index.html at the starting url
 //app.get('/', function (req, res) {
@@ -205,6 +230,9 @@ const sqlList = {
         purchaseOrder: 'select purchase_order, sum(order_quantity) as order_quantity, sum(received_quantity) as received_quantity, sum(deficiency_quantity) as deficiency_quantity from device_inventory_test where purchase_order is not null group by purchase_order',
         parent_clinic: "select parent_clinic, count(device_sn) from device_management_test where parent_clinic is not null and billable='Y'  group by parent_clinic order by parent_clinic",
         sub_clinic: "select sub_clinic, count(device_sn) from device_management_test where parent_clinic ='Heart Smart, Inc' and billable='Y'  group by sub_clinic order by sub_clinic"
+    },
+    signup: {
+         add: 'INSERT INTO public.users(first_name, last_name, email, password) VALUES (${first_name}, ${last_name}, ${email}, ${password})'
     }
 };
 
@@ -247,6 +275,58 @@ pgGetSqlUtilityFunc('/dashboard/purchaseOrder', sqlList.dashboard.purchaseOrder)
 pgGetSqlUtilityFunc('/dashboard/parentClinic', sqlList.dashboard.parent_clinic);
 pgGetSqlUtilityFunc('/dashboard/subClinic', sqlList.dashboard.sub_clinic);
 
-
+///////////////////////////////sign up//////////////////////////////////////////////////////////////////////////////////////
+// encrypt password util func
+function hashSqlUtilityFunc(url, sql) {
+    app.post(url, function(req, res, next){
+        //hash password
+        var hash = bcrypt.hashSync(req.body.password, 9);
+        req.body.password = hash;
+        db.query(sql, req.body)
+            .then( (response) => {
+                return res.json(response);
+                },  (err) => {
+                return res.status(500).json(err);
+            });
+        pgp.end();
+    });
+}
+hashSqlUtilityFunc('/addNewUsers', sqlList.signup.add);
+/////////////////////////////////////////login////////////////////////////////////////////////////////////////////////////
+//authenticate log in
+passport.use( 'local', new LocalStrategy(
+    (username, password, done) => {
+        /// query username and password from the users table
+        db.query('select email, password from public.users').then((data) => {
+            data.map( (item) => {
+                //correct user and password
+                if(item.email == username && bcrypt.compareSync(password, item.password) ) {
+                    var user = {
+                        username: username,
+                        password: item.password
+                    };
+                    return done(null, user);
+                }
+                //user exists, but wrong password
+                else if(item.email == username && !bcrypt.compareSync(password, item.password)){
+                    /*If the credentials are not valid (for example, if the password is incorrect),
+                     done should be invoked with false instead of a user to indicate an authentication failure.
+                     */
+                    return done(null, false, { message: 'Incorrect password.'});
+                }
+            });
+            //user does not exist
+            return done(null, false, {message: "User doesn't exist"});
+        }, err => done(err));
+    }
+));
+app.post('/authenticateUser', passport.authenticate('local'), function (req, res) {
+    if(req.user){return res.json(req.user)}
+});
+///////////////////////////////////log out//////////////////////////////////////////////////////////////////////////////////
+app.get("/logout", (req, res) => {
+    req.session.destroy(  (err) => {  res.end() });
+});
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 module.exports = app;
